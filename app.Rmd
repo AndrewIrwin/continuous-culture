@@ -1,3 +1,24 @@
+---
+title: "Continuous culture"
+author: "Andrew"
+date: "17/07/2020"
+runtime: shiny
+output: html_document
+---
+
+This page shows solutions to a variable internal stores model of phytoplankton culture growth. The dyanmical equations are
+
+$$\frac{dR}{dt} = d(R_0 - R) - \rho X$$
+$$\frac{dQ}{dt} = \rho - \mu Q $$
+$$\frac{dX}{dt} = X(\mu-d)$$
+where the uptake and groth functions are defined as 
+
+$$\rho(Q) = \frac{V_{max}R}{R + K_m}$$
+$$\mu(Q) = \mu_{max}\left(1-\frac{Q_{min}}{Q}\right)$$
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 #
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
@@ -13,11 +34,12 @@ library(deSolve)
 library(ggplot2)
 library(tidyr)
 library(dplyr)
+library(forcats)
 
 # system of equations
 
 # dR/dt = d(R0 - R) - rho(Q)X
-# dQ/dt = rho(Q) - mu(Q)
+# dQ/dt = rho(Q) - mu*Q
 # dX/dt = X (mu(Q) - d)
 # mu(Q) = mumax ( 1 - Qmin/Q)
 # rho(Q) = Vmax R / (Km + R)
@@ -28,9 +50,9 @@ culture.chemostat <- function(t, state, parameters) {
         rho = Vmax*R/(Km+R)
         mu = mumax*(1-Qmin/Q)
         dR = d*(R0 - R) - rho*X
-        dQ = rho - mu
+        dQ = rho - mu*Q
         dX = X*(mu-d)
-        list(c(dR, dQ, dX))  
+        list(c(dR, dQ, dX), c(rho=rho, mu=mu))  
     })
 }
 # sample integration
@@ -46,12 +68,18 @@ plotTS <- function(out) {
     mutate(log10X = log10(X)) %>%
     select(-X) %>%
     pivot_longer(R:log10X) %>%
+    mutate(name = fct_relevel(name, "R", "rho", "Q", "mu", "X")) %>%
     ggplot(aes(x=time, y = value )) + 
-    geom_line() + 
+    geom_line(size=2) + 
     facet_grid( name ~ . , scale="free_y") + 
-    theme_bw()
+    theme_bw() + 
+    theme(axis.text = element_text(size=18),
+          axis.title = element_text(size=18), 
+          strip.text = element_text(size=18))
 }
+```
 
+```{r fig.height=8}
 # functions for shiny app
 
 library(shiny)
@@ -65,6 +93,8 @@ ui <- fluidPage(
     # Sidebar with a slider input for number of bins 
     sidebarLayout(
         sidebarPanel(
+            selectInput("select", label = h3("Culture type:"), choices = list("Chemostat" = 1, "Turbidostat" = 2, "Batch" = 3, "Semi-continuous batch"=4), selected = 1),
+            sliderInput("t_final", "t_final:", min = 1, max = 100, value = 25.00, step = 1.0),
             sliderInput("mumax", "mumax:", min = 0, max = 2, value = 1.00, step = 0.05),
             sliderInput("d", "d:", min = 0, max = 2, value = 0.50, step = 0.05),
             sliderInput("Vmax", "Vmax:", min = 0, max = 2, value = 2.00, step = 0.05),
@@ -78,7 +108,7 @@ ui <- fluidPage(
 
         # Show a plot of the generated distribution
         mainPanel(
-           plotOutput("tsPlot")
+           plotOutput("tsPlot", height="800px")
         )
     )
 )
@@ -92,7 +122,7 @@ server <- function(input, output) {
         state <- c(R = input$R, Q = input$Q, X = input$X)
         
         # generate model output
-        times <- seq(0, 25, length = 100)
+        times <- seq(0, input$t_final, length = 100)
         out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
         
         # plot time series
@@ -102,3 +132,8 @@ server <- function(input, output) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
+
+
+```
+
+
