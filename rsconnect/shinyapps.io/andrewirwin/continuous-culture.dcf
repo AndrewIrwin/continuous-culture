@@ -1,0 +1,12 @@
+name: continuous-culture
+title: continuous-culture
+username:
+account: andrewirwin
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2583372
+bundleId: 3404328
+url: https://andrewirwin.shinyapps.io/continuous-culture/
+when: 1595000725.73538
+asMultiple: FALSE
+asStatic: FALSE
