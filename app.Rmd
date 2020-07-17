@@ -1,41 +1,33 @@
 ---
-title: "Continuous culture"
-author: "Andrew"
-date: "17/07/2020"
+title: "Continuous culture model for phytoplankton"
 runtime: shiny
 output: html_document
 ---
 
-This page shows solutions to a variable internal stores model of phytoplankton culture growth. The dyanmical equations are
-
-$$\frac{dR}{dt} = d(R_0 - R) - \rho X$$
-$$\frac{dQ}{dt} = \rho - \mu Q $$
-$$\frac{dX}{dt} = X(\mu-d)$$
-where the uptake and groth functions are defined as 
-
-$$\rho(Q) = \frac{V_{max}R}{R + K_m}$$
-$$\mu(Q) = \mu_{max}\left(1-\frac{Q_{min}}{Q}\right)$$
-
-
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
-
-# functions for ODE model
+knitr::opts_chunk$set(echo = FALSE)
 
 library(deSolve)
 library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(forcats)
+```
 
+
+This page shows solutions to a variable internal stores model of phytoplankton culture growth. The dyanmical equations are
+
+$$\frac{dR}{dt} = d(R_0 - R) - \rho X$$
+$$\frac{dQ}{dt} = \rho - \mu Q $$
+$$\frac{dX}{dt} = X(\mu-d)$$
+where the uptake and growth functions are defined as 
+
+$$\rho(Q) = \frac{V_{max}R}{R + K_m}$$
+$$\mu(Q) = \mu_{max}\left(1-\frac{Q_{min}}{Q}\right)$$
+
+
+
+```{r}
 # system of equations
 
 # dR/dt = d(R0 - R) - rho(Q)X
@@ -73,50 +65,32 @@ plotTS <- function(out) {
     geom_line(size=2) + 
     facet_grid( name ~ . , scale="free_y") + 
     theme_bw() + 
-    theme(axis.text = element_text(size=18),
-          axis.title = element_text(size=18), 
-          strip.text = element_text(size=18))
+    theme(axis.text = element_text(size=14),
+          axis.title = element_text(size=14), 
+          strip.text = element_text(size=14))
 }
 ```
 
-```{r fig.height=8}
-# functions for shiny app
-
-library(shiny)
-
-# Define UI for application that draws a histogram
-ui <- fluidPage(
-
-    # Application title
-    titlePanel("Continuous culture"),
-
-    # Sidebar with a slider input for number of bins 
-    sidebarLayout(
-        sidebarPanel(
-            selectInput("select", label = h3("Culture type:"), choices = list("Chemostat" = 1, "Turbidostat" = 2, "Batch" = 3, "Semi-continuous batch"=4), selected = 1),
+```{r}
+sidebarLayout(
+  verticalLayout(
+    selectInput("select", label = h3("Culture type: (fixed at chemostat now)"), choices = list("Chemostat" = 1, "Turbidostat" = 2, "Batch" = 3, "Semi-continuous batch"=4), selected = 1),
+    flowLayout(
             sliderInput("t_final", "t_final:", min = 1, max = 100, value = 25.00, step = 1.0),
             sliderInput("mumax", "mumax:", min = 0, max = 2, value = 1.00, step = 0.05),
             sliderInput("d", "d:", min = 0, max = 2, value = 0.50, step = 0.05),
             sliderInput("Vmax", "Vmax:", min = 0, max = 2, value = 2.00, step = 0.05),
             sliderInput("Km", "Km:", min = 0, max = 2, value = 1.00, step = 0.05),
             sliderInput("Qmin", "Qmin:", min = 0, max = 2, value = 0.10, step = 0.05),
-            sliderInput("R0", "R0:", min = 0, max = 2, value = 2.00, step = 0.05),
+            sliderInput("R0", "R0:", min = 0, max = 2, value = 2.00, step = 0.05)
+            ),
+    flowLayout(
             sliderInput("R", "Q:", min = 0, max = 2, value = 1.00, step = 0.05),
             sliderInput("Q", "Q:", min = 0, max = 2, value = 1.00, step = 0.05),
             sliderInput("X", "X:", min = 0, max = 2, value = 1.00, step = 0.05)
-        ),
-
-        # Show a plot of the generated distribution
-        mainPanel(
-           plotOutput("tsPlot", height="800px")
-        )
-    )
-)
-
-# Define server logic required to draw a histogram
-server <- function(input, output) {
-
-    output$tsPlot <- renderPlot({
+            )
+    ),
+    renderPlot({
         # set parameters
         params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, R0 = input$R0, d = input$d)
         state <- c(R = input$R, Q = input$Q, X = input$X)
@@ -128,11 +102,7 @@ server <- function(input, output) {
         # plot time series
         plotTS(out)
     })
-}
-
-# Run the application 
-shinyApp(ui = ui, server = server)
-
+)
 
 ```
 
