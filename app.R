@@ -1,4 +1,6 @@
 #
+# First version. Still works, but I've shifteed my work to the Markdown document.
+#
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
 #
