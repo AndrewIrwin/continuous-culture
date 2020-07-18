@@ -12,6 +12,7 @@ library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(forcats)
+library(plotly)
 ```
 
 
@@ -69,6 +70,20 @@ plotTS <- function(out) {
           axis.title = element_text(size=14), 
           strip.text = element_text(size=14))
 }
+
+plotTS2 <- function(out) {
+  o2 <- as.data.frame(out)
+  vars <- setdiff(names(o2), "time")
+  plots <- lapply(vars, function(var) {
+    plot_ly(o2, x = ~ time, y = as.formula(paste0("~", var))) %>%
+      add_lines(name=var)
+  })
+  subplot(plots, nrows=length(plots), shareX=TRUE, titleX=FALSE) %>% 
+    layout(legend = list(orientation = 'h')) %>%
+    layout(xaxis = list(title="Time"))
+
+}
+# plotTS2(out)
 ```
 
 ```{r}
@@ -104,7 +119,7 @@ sidebarLayout(
         out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
         
         # plot time series
-        plotTS(out)
+        plotTS2(out)
     }, width=600, height=800)
   )
 )

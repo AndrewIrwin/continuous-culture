@@ -1,0 +1,228 @@
+---
+title: "Continuous culture model for phytoplankton"
+runtime: shiny
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(deSolve)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(forcats)
+library(plotly)
+```
+
+
+This page shows solutions to a variable internal stores model of phytoplankton culture growth. The dyanmical equations are
+
+$$\frac{dR}{dt} = d(R_0 - R) - \rho X$$
+$$\frac{dQ}{dt} = \rho - \mu Q $$
+$$\frac{dX}{dt} = X(\mu-d)$$
+where the uptake and growth functions are defined as 
+
+$$\rho(Q) = \frac{V_{max}R}{R + K_m}$$
+$$\mu(Q) = \mu_{max}\left(1-\frac{Q_{min}}{Q}\right)$$
+
+
+
+```{r}
+# system of equations
+
+# dR/dt = d(R0 - R) - rho(Q)X
+# dQ/dt = rho(Q) - mu*Q
+# dX/dt = X (mu(Q) - d)
+# mu(Q) = mumax ( 1 - Qmin/Q)
+# rho(Q) = Vmax R / (Km + R)
+# conservation law: d/dt(R + XQ) = 0 = dR/dt + XdQ/dt + QdX/dt 
+
+culture.chemostat <- function(t, state, parameters) {
+    with(as.list(c(state, parameters)), {
+        rho = Vmax*R/(Km+R)
+        mu = mumax*(1-Qmin/Q)
+        dR = d*(R0 - R) - rho*X
+        dQ = rho - mu*Q
+        dX = X*(mu-d)
+        list(c(dR, dQ, dX), c(rho=rho, mu=mu, mass = R + Q*X))  
+    })
+}
+
+# in a turbidostat, we dilute at 2*mumax whenever X > Xstar; maybe use sigmoid function to avoid discontinuities
+culture.turbidostat <- function(t, state, parameters) {
+    with(as.list(c(state, parameters)), {
+        rho = Vmax*R/(Km+R)
+        mu = mumax*(1-Qmin/Q)
+        # d = 2*mumax/(1+exp(-4*(X-Xstar)/X))
+        d = ifelse(X>Xstar, 2*mumax, 0)  # discontinuity; hard to integrate
+        d = case_when( X < 0.95*Xstar ~ 0,
+                       X < 1.05*Xstar ~ 2*mumax*(X-0.95*Xstar)/(0.10*Xstar), 
+                       TRUE ~ 2*mumax)
+        dR = d*(R0 - R) - rho*X
+        dQ = rho - mu*Q
+        dX = X*(mu-d)
+        list(c(dR, dQ, dX), c(rho=rho, mu=mu, mass = R + Q*X))  
+    })
+}
+
+# sample integration
+# params <- c(mumax = 1.0, Vmax = 2.0, Km = 1.0, Qmin = 0.1, R0 = 2.0, d = 0.5)
+# state <- c(R = 1.0, Q = 1.0, X = 1.0)
+
+# culture.chemostat(0, state, params)
+# times <- seq(0, 25, length = 100)
+# out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+
+plotTS <- function(out) {
+  out %>% as_tibble() %>%
+    mutate(log10X = log10(X)) %>%
+    select(-X) %>%
+    pivot_longer(R:log10X) %>%
+    mutate(name = fct_relevel(name, "R", "rho", "Q", "mu", "log10X", "mass")) %>%
+    ggplot(aes(x=time, y = value )) + 
+    geom_line(size=2) + 
+    facet_wrap( vars(name), scale="free_y") + 
+    theme_bw() + 
+    theme(axis.text = element_text(size=14),
+          axis.title = element_text(size=14), 
+          strip.text = element_text(size=14))
+}
+
+plotTS2 <- function(out) {
+  o2 <- as.data.frame(out)
+  o2$log10X = log10(o2$X)
+  vars <- c("R", "rho", "Q", "mu", "log10X", "mu") #  setdiff(names(o2), "time")
+  plots <- lapply(vars, function(var) {
+    plot_ly(o2, x = ~ time, y = as.formula(paste0("~", var))) %>%
+      add_lines(name=var)
+  })
+  subplot(plots, nrows=length(plots)/2, shareX=TRUE, titleX=FALSE) %>% 
+    layout(legend = list(orientation = 'h')) # %>%
+    # layout(xaxis = list(title="Time"))
+}
+# plotTS(out)
+```
+
+```{r}
+commonParameters <- function() {
+ flowLayout(
+   sliderInput("t_final", "t_final:", min = 1, max = 100, value = 25.00, step = 1.0),
+   sliderInput("mumax", "mumax:", min = 0, max = 2, value = 1.00, step = 0.05),
+   sliderInput("Vmax", "Vmax:", min = 0, max = 2, value = 2.00, step = 0.05),
+   sliderInput("Km", "Km:", min = 0, max = 2, value = 1.00, step = 0.05),
+   sliderInput("Qmin", "Qmin:", min = 0, max = 2, value = 0.10, step = 0.05),
+   sliderInput("R0", "R0:", min = 0, max = 2, value = 2.00, step = 0.05),
+   sliderInput("R", "R:", min = 0, max = 2, value = 1.00, step = 0.05),
+   sliderInput("Q", "Q:", min = 0, max = 2, value = 1.00, step = 0.05),
+   sliderInput("X", "X:", min = 0, max = 2, value = 1.00, step = 0.05)
+ )
+}
+```
+```{r}
+w = 600; h = 400
+fluidPage(
+  sidebarLayout(
+    sidebarPanel(
+      verticalLayout(
+        conditionalPanel(
+          'input.select === "Chemostat"',
+          verticalLayout(
+             sliderInput("d", "d:", min = 0, max = 2, value = 0.50, step = 0.05)
+          )        
+        ),
+        conditionalPanel(
+          'input.select === "Turbidostat"',
+          verticalLayout(
+             sliderInput("log10Xstar", "log10 X*:", min = 0, max = 2, value = 0.50, step = 0.05)
+          )        
+        ),
+        conditionalPanel(
+          'input.select === "Semi-continuous"',
+          verticalLayout(
+             sliderInput("Period", "Period:", min = 5, max = 100, value = 20, step = 0.5),
+             sliderInput("Df", "Dilution factor:", min = 0, max = 1, value = 0.50, step = 0.05)
+          )        
+        ),
+        commonParameters()
+      )
+    ),
+    mainPanel(
+      tabsetPanel(
+        id = "select",
+        tabPanel("Chemostat", {
+           renderPlot({
+             # set parameters
+             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, R0 = input$R0, d = input$d)
+             state <- c(R = input$R, Q = input$Q, X = input$X)
+        
+            # generate model output
+            times <- seq(0, input$t_final, length = 100)
+            out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+        
+            # plot time series
+            plotTS(out)
+          }, width=w, height=h)
+        }),
+        tabPanel("Turbidostat", {
+           renderPlot({
+             # set parameters
+             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, R0 = input$R0, Xstar = 10^(input$log10Xstar))
+             state <- c(R = input$R, Q = input$Q, X = input$X)
+        
+            # generate model output
+            times <- seq(0, input$t_final, length = 100)
+            out <- ode(y = state, times = times, func = culture.turbidostat, parms = params)
+        
+            # plot time series
+            plotTS(out)
+          }, width=w, height=h)
+        }),
+        tabPanel("Batch", {
+           renderPlot({
+             # set parameters
+             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, R0 = input$R0, d = 0)
+             state <- c(R = input$R, Q = input$Q, X = input$X)
+        
+            # generate model output
+            times <- seq(0, input$t_final, length = 100)
+            out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+        
+            # plot time series
+            plotTS(out)
+          }, width=w, height=h)
+        }),
+        tabPanel("Semi-continuous", {
+           # run a series of batch cultures of length Period and diluting by a factor Df at the end of each
+           renderPlot({
+             # set parameters
+             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, R0 = input$R0, d = 0)
+             state <- c(R = input$R, Q = input$Q, X = input$X)
+        
+             # generate model output
+             t0 = 0
+             times <- seq(t0, t0+input$Period, length = 100)
+             out <- ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame()
+             while(out$time[nrow(out)] < input$t_final) {
+               t0 <- out$time[nrow(out)]
+               times <- seq(t0, t0+input$Period, length = 100)
+               state <- c(R = input$Df * out$R[nrow(out)] + (1-input$Df)*input$R0,
+                          Q = out$Q[nrow(out)],
+                          X = input$Df * out$X[nrow(out)] + 0) 
+               out <- bind_rows( out, ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame() )
+             }
+        
+             # plot time series
+             plotTS(out)
+          }, width=w, height=h)
+          })
+      )
+    )
+  )
+)
+        
+     
+
+```
+
+
