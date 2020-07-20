@@ -1,7 +1,13 @@
 ---
 title: "Continuous culture model for phytoplankton"
 runtime: shiny
-output: html_document
+author: "Andrew Irwin"
+date: "2020 July 20"
+output: 
+  html_document:
+    toc: true
+    toc-float: true
+  
 ---
 
 ```{r setup, include=FALSE}
@@ -15,18 +21,37 @@ library(forcats)
 library(plotly)
 ```
 
+## Overview
 
-This page shows solutions to a variable internal stores model of phytoplankton culture growth. The dyanmical equations are
+In this document I explore applications of a variable internal stores model of phytoplankton culture growth adapted from Grover (1991)](https://www.journals.uchicago.edu/doi/abs/10.1086/285254).
 
-$$\frac{dR}{dt} = d(R_0 - R) - \rho X$$
+There are three pools: resources in the growth medium, such as nitrate, $R$ (mol L${-1}$), resources stored in the cell and available for growth, $Q$ (mol cell$^{-1}$), and the cell density, $X$ (cells L$^{-1}$). In the examples below I don't use these units. Instead, all quantities are chosen to be close to 1. Normal values for nanophytoplankton and non-dimensionalized equations are explored later (to be written).
+
+## Equations
+
+The equations for the three pools are
+
+$$\frac{dR}{dt} = d(R_s - R) - \rho X$$
 $$\frac{dQ}{dt} = \rho - \mu Q $$
-$$\frac{dX}{dt} = X(\mu-d)$$
-where the uptake and growth functions are defined as 
+$$\frac{dX}{dt} = X(\mu-d).$$
+
+Which can be read as the following: (1) Resources in the media are supplied at a rate $d$ and concentration $R_s$, are consumed at a rate proportional to the uptake $\rho$ of each cell times the density of cells $X$, and unconsumed resources are washed out at a rate $d$. (2) Internal stores of the nutrient for each cell are increased at a rate $\rho$ and depleted at the growth rate $\mu$ times the current amount of storage per cell $Q$. (3) The cell density increases at the growth rate $\mu$ and decreases at the rate of dilution $d$. Initial values at time $t=0$ will be written as $R_0, Q_0,$ and $X_0$.
+
+The uptake and growth functions are defined as 
 
 $$\rho(Q) = \frac{V_{max}R}{R + K_m}$$
-$$\mu(Q) = \mu_{max}\left(1-\frac{Q_{min}}{Q}\right)$$
+$$\mu(Q) = \mu_{max}\left(1-\frac{Q_{min}}{Q}\right).$$
+Both functions are saturating functions: $V_{max}$ and $K_m$ define the shape of the Michaelis-Menten uptake curve and $\mu_{max}$ and $Q_{min}$ define the shape of the growth response which is $0$ when internal stores are depleted to the minimum value $Q_{min$.
 
+Total mass should change smoothly from the initial value to a value determined by the supply concentration $R_s$ and can be computed as 
 
+$$M = R + XQ$$
+If the initial mass in the reaction vessel is very close to the equilibrium value then very small and noisy deviations will be visible in the trajectory of $M$.
+
+A commonly used parameter from these equations is the minimum resource concentration needed for the cells to grow. This value $R^*$ can be found from the equilibrium solution with $X>0$ by 
+setting the derivatives equal to 0:
+
+$$R^* = \frac{K_md}{\mu_{max}-d}.$$
 
 ```{r}
 # system of equations
@@ -42,7 +67,7 @@ culture.chemostat <- function(t, state, parameters) {
     with(as.list(c(state, parameters)), {
         rho = Vmax*R/(Km+R)
         mu = mumax*(1-Qmin/Q)
-        dR = d*(R0 - R) - rho*X
+        dR = d*(Rs - R) - rho*X
         dQ = rho - mu*Q
         dX = X*(mu-d)
         list(c(dR, dQ, dX), c(rho=rho, mu=mu, mass = R + Q*X))  
@@ -59,7 +84,7 @@ culture.turbidostat <- function(t, state, parameters) {
         d = case_when( X < 0.95*Xstar ~ 0,
                        X < 1.05*Xstar ~ 2*mumax*(X-0.95*Xstar)/(0.10*Xstar), 
                        TRUE ~ 2*mumax)
-        dR = d*(R0 - R) - rho*X
+        dR = d*(Rs - R) - rho*X
         dQ = rho - mu*Q
         dX = X*(mu-d)
         list(c(dR, dQ, dX), c(rho=rho, mu=mu, mass = R + Q*X))  
@@ -79,7 +104,7 @@ plotTS <- function(out) {
     mutate(log10X = log10(X)) %>%
     select(-X) %>%
     pivot_longer(R:log10X) %>%
-    mutate(name = fct_relevel(name, "R", "rho", "Q", "mu", "log10X", "mass")) %>%
+    mutate(name = fct_relevel(name, "R", "Q", "log10X", "rho", "mu","mass")) %>%
     ggplot(aes(x=time, y = value )) + 
     geom_line(size=2) + 
     facet_wrap( vars(name), scale="free_y") + 
@@ -104,6 +129,102 @@ plotTS2 <- function(out) {
 # plotTS(out)
 ```
 
+## Examples
+
+### Batch culture
+
+Fresh medium inoculated with a culture and allowed to grow as a closed system -- with no material added or removed -- is known as a batch culture. The general trajectory is that resources are consumed and cells grow until resources become limiting at which point growth slows and eventually ceases. This is the most straightforward experimental setup and also roughly corresponds to the trajectory of a seasonal phytoplankton bloom.
+
+For a batch culture, we set the dilution rate $d=0$ and choose all the initial conditions. Here I have set $\mu_{max} = 1.0$ with a maximum uptake rate of twice this $V_{max} = 2.0$, the half-saturation constant for resource uptake is quite small $K_m=1.0$ compared to the supply concentration $R_0=2.0$. The minimum quota $Q_{min}$ is small compared to the initial value of cell quota $Q=1.0$, and the initial resource concentration in the media is $R=1.0$, so the cells are initially resource replete. The initial cell densitity is $X=1.0$ so the total mass is $M = 2$ and the equilibrium mass is $R_0=2$.
+
+A culture acclimated to the initial conditions (so that $\rho = \mu Q$ at time 0) will grow exponentially at time 0 with a gradually decreasing growth rate until resources are depleted. The equilibrium solution will have extracellular resources drawn down to 0, intracellular storage drawn down to $Q_{min}$ and a zero growth rate. A real culture will exhibit some cell death and decrease in cell density, but that is not included in our model.
+
+```{r}
+# sample integration
+params <- c(mumax = 1.0, Vmax = 2.0, Km = 1.0, Qmin = 0.1, Rs = 2.0, d = 0)
+state <- c(R = 1.0, Q = 1.0, X = 1.0)
+
+# culture.chemostat(0, state, params)
+times <- seq(0, 10, length = 100)
+out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+plotTS(out)
+```
+
+### Chemostat culture
+
+The opposite extreme to a batch culture is the chemostat which undergoes dilution with fresh media at a constant (non-zero) rate $d$ and after some time achieves an equilibrium uptake rate, cell storage, growth rate, and cell density. Cells will acclimate to grow at the dilution rate so that $\mu=d$ and we say that the dilution rate sets the growth rate. These experiments require pumps and a steady supply of fresh media to keep the cells growing. They are a kind of gold-standard for ensuring that equilibrium conditions are established. If the dilution rate is too high (close to $\mu_max}$) the culture will be susceptible to washout or catastrophic failure. If the dilution rate is very slow, the growth rate will be slow, but perhaps not due to the limitation of the resource described in the equations; other factors such as DIC (pH) or light might be limiting growth.
+
+Here is an example with $d = 0.5 = \mu_{max}/2$ and otherwise all conditions the same as the batch culture experiment. Note in particular that at equilibrium growth rate is equal to the
+imposed dilution rate.
+
+```{r}
+# sample integration
+params <- c(mumax = 1.0, Vmax = 2.0, Km = 1.0, Qmin = 0.1, Rs = 2.0, d = 0.5)
+state <- c(R = 1.0, Q = 1.0, X = 1.0)
+
+# culture.chemostat(0, state, params)
+times <- seq(0, 20, length = 100)
+out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+plotTS(out)
+```
+
+### Turbidostat culture
+
+Changing the resource supply rate in a chemostat does not affect growth rate, since growth rate is determined by the dilution rate. An alternative continuous culture setup is the turbidostat which maintains constant cell numbers (assayed by turbidity in an experimental setup). The dilution rate is adjusted to match growth rate with the goal of maintaining a constant cell density. We define $d$ in our equations to be 0 if $X<X^*$ and a minimum of $\mu_{max}$ otherwise. (Numerically we do something a bit different since this defiition is not continuous and creates computational difficulties.)
+
+This setup uses the same parameters as the chemostat system, but with $d$ set as described and a biomass density target of $X^* = 2.0$ (or $\log_{10}X^* = 0.30$).
+
+```{r}
+# sample integration
+params <- c(mumax = 1.0, Vmax = 2.0, Km = 1.0, Qmin = 0.1, Rs = 2.0, Xstar = 2.0)
+state <- c(R = 1.0, Q = 1.0, X = 1.0)
+
+# culture.chemostat(0, state, params)
+times <- seq(0, 5, length = 100)
+out <- ode(y = state, times = times, func = culture.turbidostat, parms = params)
+plotTS(out)
+```
+
+### Semi-continuous batch culture
+
+A very common experimental setup in the lab combines features of these different arrangements. The goal is to have a simple setup that doesn't require a pump and media reservoir, but to maintain near-constant or at least near-ideal conditions for growth. The solution is to have a series of batch cultures which are diluted into fresh media before the cell density gets to0 high or the resources in the media are drawn down too low. The main goal is to have nearly constant growth rates.
+
+We accomplish this with our equations by setting dilution rate to 0 and diluting periodically with a ratio of old culture and fresh media to achieve a fixed initial culture density $X^*$. In practice, instead of dilution every $T$ time units, it would be more conventional to dilute the day before $X$ was predicted to get above a specified threshold.
+
+Here we use the same conditions as above and dilute the culture every $T=3$ time periods and I've increased the resource concentration in the supplied media to $R_s=30$ so that resources never get drawn down enough to be strongly limiting. Notice that $R$ and $\rho$ vary a lot, $Q$ much less, and $\mu$ very little.
+
+```{r}
+# sample integration
+params <- c(mumax = 1.0, Vmax = 2.0, Km = 1.0, Qmin = 0.1, Rs = 30.0, d = 0, t_final = 15)
+state <- c(R = 1.0, Q = 1.0, X = 1.0)
+
+# generate model output
+t0 = 0
+T = 3
+Xstar = 1.0
+times <- seq(t0, t0+T, length = 100)
+out <- ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame()
+while(out$time[nrow(out)] < params["t_final"]) {
+  t0 <- out$time[nrow(out)]
+  times <- seq(t0, t0+T, length = 100)
+  Df = Xstar/out$X[nrow(out)]
+  state <- c(R = Df * out$R[nrow(out)] + (1-Df)*params["Rs"],
+             Q = out$Q[nrow(out)],
+             X = Df * out$X[nrow(out)] + 0) 
+  names(state)[1] = "R"
+  out <- bind_rows( out, ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame() )
+}
+        
+# plot time series
+plotTS(out)
+```
+
+
+## Interactive example
+
+Here you can experiment with these equation, changing the settings and the obtaining the updated trajectories.
+
+
 ```{r}
 commonParameters <- function() {
  flowLayout(
@@ -112,10 +233,10 @@ commonParameters <- function() {
    sliderInput("Vmax", "Vmax:", min = 0, max = 2, value = 2.00, step = 0.05),
    sliderInput("Km", "Km:", min = 0, max = 2, value = 1.00, step = 0.05),
    sliderInput("Qmin", "Qmin:", min = 0, max = 2, value = 0.10, step = 0.05),
-   sliderInput("R0", "R0:", min = 0, max = 2, value = 2.00, step = 0.05),
-   sliderInput("R", "R:", min = 0, max = 2, value = 1.00, step = 0.05),
-   sliderInput("Q", "Q:", min = 0, max = 2, value = 1.00, step = 0.05),
-   sliderInput("X", "X:", min = 0, max = 2, value = 1.00, step = 0.05)
+   sliderInput("Rs", "Rs:", min = 0, max = 50, value = 2.00, step = 0.05),
+   sliderInput("R", "R0:", min = 0, max = 2, value = 1.00, step = 0.05),
+   sliderInput("Q", "Q0:", min = 0, max = 2, value = 1.00, step = 0.05),
+   sliderInput("X", "X0:", min = 0, max = 2, value = 1.00, step = 0.05)
  )
 }
 ```
@@ -141,7 +262,7 @@ fluidPage(
           'input.select === "Semi-continuous"',
           verticalLayout(
              sliderInput("Period", "Period:", min = 5, max = 100, value = 20, step = 0.5),
-             sliderInput("Df", "Dilution factor:", min = 0, max = 1, value = 0.50, step = 0.05)
+             sliderInput("Xstar", "X*:", min = 0, max = 1, value = 0.50, step = 0.05)
           )        
         ),
         commonParameters()
@@ -153,7 +274,7 @@ fluidPage(
         tabPanel("Chemostat", {
            renderPlot({
              # set parameters
-             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, R0 = input$R0, d = input$d)
+             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, Rs = input$Rs, d = input$d)
              state <- c(R = input$R, Q = input$Q, X = input$X)
         
             # generate model output
@@ -167,7 +288,7 @@ fluidPage(
         tabPanel("Turbidostat", {
            renderPlot({
              # set parameters
-             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, R0 = input$R0, Xstar = 10^(input$log10Xstar))
+             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, Rs = input$Rs, Xstar = 10^(input$log10Xstar))
              state <- c(R = input$R, Q = input$Q, X = input$X)
         
             # generate model output
@@ -181,7 +302,7 @@ fluidPage(
         tabPanel("Batch", {
            renderPlot({
              # set parameters
-             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, R0 = input$R0, d = 0)
+             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, Rs = input$Rs, d = 0)
              state <- c(R = input$R, Q = input$Q, X = input$X)
         
             # generate model output
@@ -196,7 +317,7 @@ fluidPage(
            # run a series of batch cultures of length Period and diluting by a factor Df at the end of each
            renderPlot({
              # set parameters
-             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, R0 = input$R0, d = 0)
+             params <- c(mumax = input$mumax, Vmax = input$Vmax, Km = input$Km, Qmin = input$Qmin, Rs = input$Rs, d = 0)
              state <- c(R = input$R, Q = input$Q, X = input$X)
         
              # generate model output
@@ -206,9 +327,10 @@ fluidPage(
              while(out$time[nrow(out)] < input$t_final) {
                t0 <- out$time[nrow(out)]
                times <- seq(t0, t0+input$Period, length = 100)
-               state <- c(R = input$Df * out$R[nrow(out)] + (1-input$Df)*input$R0,
+               Df = input$Xstar/out$X[nrow(out)]
+               state <- c(R = Df * out$R[nrow(out)] + (1-Df)*input$Rs,
                           Q = out$Q[nrow(out)],
-                          X = input$Df * out$X[nrow(out)] + 0) 
+                          X = Df * out$X[nrow(out)] + 0) 
                out <- bind_rows( out, ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame() )
              }
         
@@ -225,4 +347,9 @@ fluidPage(
 
 ```
 
+## Exercises
+
+Play around with the various scenarios.
+
+* Semi-continuous batch: Find a set-up where $\mu$ is approximately constant after a few dilutions. What happens if you make the time between dilutions longer? What seems to change faster, the growth rate or the slope on the $\log X(t)$ vs $t$ curve?
 
