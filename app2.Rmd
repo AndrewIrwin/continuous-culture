@@ -1,13 +1,12 @@
 ---
 title: "Continuous culture model for phytoplankton"
-runtime: shiny
 author: "Andrew Irwin"
 date: "2020 July 20"
 output: 
   html_document:
     toc: true
     toc-float: true
-  
+runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
@@ -92,12 +91,12 @@ culture.turbidostat <- function(t, state, parameters) {
 }
 
 # sample integration
-# params <- c(mumax = 1.0, Vmax = 2.0, Km = 1.0, Qmin = 0.1, R0 = 2.0, d = 0.5)
+# params <- c(mumax = 1.0, Vmax = 2.0, Km = 1.0, Qmin = 0.1, Rs = 2.0, d = 0.5)
 # state <- c(R = 1.0, Q = 1.0, X = 1.0)
 
 # culture.chemostat(0, state, params)
 # times <- seq(0, 25, length = 100)
-# out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+# out <- ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame()
 
 plotTS <- function(out) {
   out %>% as_tibble() %>%
@@ -146,13 +145,13 @@ state <- c(R = 1.0, Q = 1.0, X = 1.0)
 
 # culture.chemostat(0, state, params)
 times <- seq(0, 10, length = 100)
-out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+out <- ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame()
 plotTS(out)
 ```
 
 ### Chemostat culture
 
-The opposite extreme to a batch culture is the chemostat which undergoes dilution with fresh media at a constant (non-zero) rate $d$ and after some time achieves an equilibrium uptake rate, cell storage, growth rate, and cell density. Cells will acclimate to grow at the dilution rate so that $\mu=d$ and we say that the dilution rate sets the growth rate. These experiments require pumps and a steady supply of fresh media to keep the cells growing. They are a kind of gold-standard for ensuring that equilibrium conditions are established. If the dilution rate is too high (close to $\mu_max}$) the culture will be susceptible to washout or catastrophic failure. If the dilution rate is very slow, the growth rate will be slow, but perhaps not due to the limitation of the resource described in the equations; other factors such as DIC (pH) or light might be limiting growth.
+The opposite extreme to a batch culture is the chemostat which undergoes dilution with fresh media at a constant (non-zero) rate $d$ and after some time achieves an equilibrium uptake rate, cell storage, growth rate, and cell density. Cells will acclimate to grow at the dilution rate so that $\mu=d$ and we say that the dilution rate sets the growth rate. These experiments require pumps and a steady supply of fresh media to keep the cells growing. They are a kind of gold-standard for ensuring that equilibrium conditions are established. If the dilution rate is too high (close to $\mu_{max}$) the culture will be susceptible to washout or catastrophic failure. If the dilution rate is very slow, the growth rate will be slow, but perhaps not due to the limitation of the resource described in the equations; other factors such as DIC (pH) or light might be limiting growth.
 
 Here is an example with $d = 0.5 = \mu_{max}/2$ and otherwise all conditions the same as the batch culture experiment. Note in particular that at equilibrium growth rate is equal to the
 imposed dilution rate.
@@ -164,7 +163,7 @@ state <- c(R = 1.0, Q = 1.0, X = 1.0)
 
 # culture.chemostat(0, state, params)
 times <- seq(0, 20, length = 100)
-out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+out <- ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame()
 plotTS(out)
 ```
 
@@ -181,7 +180,7 @@ state <- c(R = 1.0, Q = 1.0, X = 1.0)
 
 # culture.chemostat(0, state, params)
 times <- seq(0, 5, length = 100)
-out <- ode(y = state, times = times, func = culture.turbidostat, parms = params)
+out <- ode(y = state, times = times, func = culture.turbidostat, parms = params) %>% as.data.frame()
 plotTS(out)
 ```
 
@@ -279,7 +278,7 @@ fluidPage(
         
             # generate model output
             times <- seq(0, input$t_final, length = 100)
-            out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+            out <- ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame()
         
             # plot time series
             plotTS(out)
@@ -293,7 +292,7 @@ fluidPage(
         
             # generate model output
             times <- seq(0, input$t_final, length = 100)
-            out <- ode(y = state, times = times, func = culture.turbidostat, parms = params)
+            out <- ode(y = state, times = times, func = culture.turbidostat, parms = params) %>% as.data.frame()
         
             # plot time series
             plotTS(out)
@@ -307,7 +306,7 @@ fluidPage(
         
             # generate model output
             times <- seq(0, input$t_final, length = 100)
-            out <- ode(y = state, times = times, func = culture.chemostat, parms = params)
+            out <- ode(y = state, times = times, func = culture.chemostat, parms = params) %>% as.data.frame()
         
             # plot time series
             plotTS(out)

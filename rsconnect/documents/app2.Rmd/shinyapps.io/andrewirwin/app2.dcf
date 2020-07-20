@@ -5,8 +5,8 @@ account: andrewirwin
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 2584205
-bundleId: 3406635
+bundleId: 3413376
 url: https://andrewirwin.shinyapps.io/app2/
-when: 1595069263.90495
+when: 1595269943.53357
 asMultiple: FALSE
 asStatic: FALSE
