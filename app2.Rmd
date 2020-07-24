@@ -1,7 +1,7 @@
 ---
 title: "Continuous culture model for phytoplankton"
 author: "Andrew Irwin"
-date: "2020 July 20"
+date: "2020 July 23"
 output: 
   html_document:
     toc: true
@@ -22,9 +22,9 @@ library(plotly)
 
 ## Overview
 
-In this document I explore applications of a variable internal stores model of phytoplankton culture growth adapted from Grover (1991)](https://www.journals.uchicago.edu/doi/abs/10.1086/285254).
+In this document I explore a variable internal stores model of phytoplankton culture growth adapted from [Grover (1991)](https://www.journals.uchicago.edu/doi/abs/10.1086/285254).
 
-There are three pools: resources in the growth medium, such as nitrate, $R$ (mol L${-1}$), resources stored in the cell and available for growth, $Q$ (mol cell$^{-1}$), and the cell density, $X$ (cells L$^{-1}$). In the examples below I don't use these units. Instead, all quantities are chosen to be close to 1. Normal values for nanophytoplankton and non-dimensionalized equations are explored later (to be written).
+There are three pools: resources in the growth medium, such as nitrate, $R$ (mol L$^{-1}$), resources stored in the cell and available for growth, $Q$ (mol cell$^{-1}$), and the cell density, $X$ (cells L$^{-1}$). In the examples below I don't use these units. Instead, all quantities are chosen to be close to 1. Plausible values for _Thalassiosira pseudonana_ and the development of non-dimensionalized equations are explored after some examples.
 
 ## Equations
 
@@ -38,19 +38,36 @@ Which can be read as the following: (1) Resources in the media are supplied at a
 
 The uptake and growth functions are defined as 
 
-$$\rho(Q) = \frac{V_{max}R}{R + K_m}$$
+$$\rho(Q) = \frac{V_{max}R}{K_m+R}$$
 $$\mu(Q) = \mu_{max}\left(1-\frac{Q_{min}}{Q}\right).$$
-Both functions are saturating functions: $V_{max}$ and $K_m$ define the shape of the Michaelis-Menten uptake curve and $\mu_{max}$ and $Q_{min}$ define the shape of the growth response which is $0$ when internal stores are depleted to the minimum value $Q_{min$.
+Both functions are saturating functions: $V_{max}$ and $K_m$ define the shape of the Michaelis-Menten uptake curve and $\mu_{max}$ and $Q_{min}$ define the shape of the growth response which is $0$ when internal stores are depleted to the minimum value $Q_{min}$.
 
 Total mass should change smoothly from the initial value to a value determined by the supply concentration $R_s$ and can be computed as 
 
 $$M = R + XQ$$
 If the initial mass in the reaction vessel is very close to the equilibrium value then very small and noisy deviations will be visible in the trajectory of $M$.
 
-A commonly used parameter from these equations is the minimum resource concentration needed for the cells to grow. This value $R^*$ can be found from the equilibrium solution with $X>0$ by 
+A commonly used parameter from the simpler Monod model (which has no cell quota $Q$ and writes the growth function the way we wrote the updake function) is the minimum resource concentration needed for the cells to grow. This value $R^*$ can be found from the equilibrium solution with $X>0$ by 
 setting the derivatives equal to 0:
 
-$$R^* = \frac{K_md}{\mu_{max}-d}.$$
+$$R^* = \frac{K_m d}{\mu_{max}-d}.$$
+Note that as the dilution rate increases to approach the maximum growth rate, the concentration of resource required to support these cells increases without bound.
+
+For the Droop model, the algebra and corresponding expression is somewhat more complicated, since we need to find both $Q^*$ and $R^*$ from $\frac{dX}{dt} = 0$ and $\frac{dQ}{dt}=0$:
+
+$$Q^* = \frac{\mu_{max}Q_{min}}{\mu_{max}-d}$$
+
+$$R^* = \frac{\mu_{max}K_m(Q^*-Q_{min})}{V_{max}-\mu_{max}(Q^*-Q_{min})} =  \frac{K_m}{\frac{V_{max}}{\mu_{max}(Q^*-Q_{min})}-1}$$
+We notice several things from these expressions. In a batch culture, with $d=0$, $Q^* = Q_{min}$ and $R^* = -K_m$. (We interpret a negative $R^*$ as meaning that $R$ can be drawn down to 0.) In a chemostat, as we increase $d$ towards $\mu_{max}$, $Q^*$ grows ever larger and $R^*$ is eventually $0$. In a turbidostat, the dilution rate is adjusted to match the growth rate, and we obtain $R^*$ from $\frac{dR}{dt}=0$ yielding the rather unwieldy expression
+
+$$R^* = \frac{1}{2}\left( R_s-K_m-\frac{X^*V_{max}}{d}+\sqrt{(R_s-K_m-X^*V_{max}/d)^2+4R_sK_m}\right)$$
+
+where $d = \mu = \mu_{max}\left(1-\frac{Q_{min}}{Q^*}\right)$ and $X^*$ is set by the experimenter. (We selected the positive root from the quadratic formula.)
+
+
+
+
+
 
 ```{r}
 # system of equations
@@ -106,11 +123,12 @@ plotTS <- function(out) {
     mutate(name = fct_relevel(name, "R", "Q", "log10X", "rho", "mu","mass")) %>%
     ggplot(aes(x=time, y = value )) + 
     geom_line(size=2) + 
+    expand_limits(y=0) +
     facet_wrap( vars(name), scale="free_y") + 
     theme_bw() + 
     theme(axis.text = element_text(size=14),
           axis.title = element_text(size=14), 
-          strip.text = element_text(size=14))
+          strip.text = element_text(size=14)) 
 }
 
 plotTS2 <- function(out) {
@@ -186,7 +204,7 @@ plotTS(out)
 
 ### Semi-continuous batch culture
 
-A very common experimental setup in the lab combines features of these different arrangements. The goal is to have a simple setup that doesn't require a pump and media reservoir, but to maintain near-constant or at least near-ideal conditions for growth. The solution is to have a series of batch cultures which are diluted into fresh media before the cell density gets to0 high or the resources in the media are drawn down too low. The main goal is to have nearly constant growth rates.
+A very common experimental setup in the lab combines features of these different arrangements. The goal is to have a simple setup that doesn't require a pump and media reservoir, but to maintain near-constant or at least near-ideal conditions for growth. The solution is to have a series of batch cultures which are diluted into fresh media before the cell density gets too high or the resources in the media are drawn down too low. The main goal is to have nearly constant growth rates.
 
 We accomplish this with our equations by setting dilution rate to 0 and diluting periodically with a ratio of old culture and fresh media to achieve a fixed initial culture density $X^*$. In practice, instead of dilution every $T$ time units, it would be more conventional to dilute the day before $X$ was predicted to get above a specified threshold.
 
@@ -221,7 +239,7 @@ plotTS(out)
 
 ## Interactive example
 
-Here you can experiment with these equation, changing the settings and the obtaining the updated trajectories.
+Here you can experiment with these equations, changing the settings and the obtaining the updated trajectories.
 
 
 ```{r}
@@ -346,9 +364,42 @@ fluidPage(
 
 ```
 
+
+## Non-dimensionalized equations
+
+Our model has one independent variable ($t$, time), three dependent (or "state") variables ($R$, $Q$, and $X$) and 6 parameters ($\mu_{max}$, $d$, $Q_{min}$, $V_{max}$, $K_m$, and $R_s$.) Some of these parameters are best understood in terms of their values realtive to each other. If the dilution rate is larger than the maximum growth rate, then washout is inevitable, so a natural scale for $\mu_{max}$ is its magnitude relative to $d$. Both of these parameters have the same dimensions (Time$^{-1}$) so their quotient $\tilde\mu_{max}=\mu_{max}/d$ is dimensionless. In our model we are interested in any value $0 < \tilde\mu_{max} < 1$. Similarly, the half saturation constant and resource supply concentration both have the same dimensions (mol Volume$^{-1}$, although mol is not really a dimension, but it does represent the measurement scale of the amount of resource). We can form a dimensionless value $\tilde R_s = R_s/K_m$ and fix $K_m=1$. We are interested in any positive value of $\tilde R_s$, but values less than 1 will lead to strongly resource limiting situations. The third pair, minimum cell quota and maximum uptake rate have different dimensions (mol cell$^{-1}$ and mol cell$^{-1}$ Time$^{-1}$). The first we can fix at one and use it to redefine cell quota, $\tilde Q = Q / Q_{min}$. The second we scale by both $d$ and $Q_{min}$ to get the following dimensionless quantity: $\tilde V_{max} = V_{max}/(Q_{min}d)$. After all this, we have fixed three parameters at the value 1 and so we really now only have three parameters in our equations. We need to scale all our other variables to make them dimensionless, so we write $\tilde R = R/K_m$, $\tilde X = X Q_{min}/K_m$, and $\tilde t = td$. We substitute these 7 equations into our original model to change the equations into dimensionless quantities. In keeping with our notation all variables below should have a tilde decoration, but for simplicity we omit it:
+
+$$\frac{dR}{dt} = (R_s - R) - X\left(\frac{V_{max}{R}}{1+R} \right)$$
+
+$$\frac{dQ}{dt} = \frac{V_{max}R}{1+R} - \mu_{max}(Q-1)$$
+$$\frac{dX}{dt} = X\left(\mu_{max}\left(1-\frac{1}{Q}\right) - 1\right)$$
+These are exactly the same as our original equations but with dimensionless quantities measured relative to $d=1$, $Q_{min}=1$ and $K_m=1$. Incidentally, all this analysis explains why it is not important to use biologically meaningful values in our analyses presented above.
+
+Since total resource mass in the culture vessel is $M = R + XQ$, dimensionless mass is $\tilde M = \frac{M}{K_m} = \tilde R + \tilde X \tilde Q$.
+
+Since $d=1$, this transformation does not work for batch cultures or semi-continuous batch cultures. Instead fix $\mu_{max}=1$.
+
+
+## Biologically plausible values
+
+A parameter-fitting exercise, using the data in [Liefer et al (2019)](https://dx.doi.org/10.3389/fmicb.2019.00763) yields the following estimates for growth rate and minimum N cell quota for _Thalassiosira pseudonana_.
+
+$\mu_{max} = 0.70 d^{-1}$, $Q_{min} = 0.037$ pmol cell$^{-1}$.
+
+Data from that study do not constrain $V_{max}$ or $K_m$ well, but $K_m$ appears to be small and $V_{max}$ approximately matches growth rate. For kinetic studies of uptake of nitrate, nitrite, phosphate, and silicate see [Parslow et al (1984)](https://link.springer.com/content/pdf/10.1007/BF00393085.pdf).
+
+We will use $V_{max} = 1.0 d^{-1}$ and $k_m = 0.1 \mu$ mol L$^{-1}$. Note that $V_{max}$ is reported relative to $Q$ in Parslow et al (1984).
+
+This simple model does not place an upper bound on $Q$.
+
+
+
 ## Exercises
 
 Play around with the various scenarios.
 
 * Semi-continuous batch: Find a set-up where $\mu$ is approximately constant after a few dilutions. What happens if you make the time between dilutions longer? What seems to change faster, the growth rate or the slope on the $\log X(t)$ vs $t$ curve?
 
+* Check the dimensionless quantity reasoning. Set $d=1$, $Q_{min}=1$, and $K_m=1$ and note the output of the model. Then reduce each by a factor of two and scale the other three constants and the inital values. You should obtain the same results, except for a scaling factor of 2 in time and total mass.
+
+* Check that mass is conserved (to within a few parts per million; the error arises from the numerical method to solve the equations) once the system comes to a steady state regardless constants (the values of $R_s$ and initial conditions do matter). If the initial mass in the reaction vessel is very close to the supply concentration, then the very small and noisy deviations will be visible in the trajectory of $M$.
