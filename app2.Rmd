@@ -38,7 +38,7 @@ Which can be read as the following: (1) Resources in the media are supplied at a
 
 The uptake and growth functions are defined as 
 
-$$\rho(Q) = \frac{V_{max}R}{K_m+R}$$
+$$\rho(R) = \frac{V_{max}R}{K_m+R}$$
 $$\mu(Q) = \mu_{max}\left(1-\frac{Q_{min}}{Q}\right).$$
 Both functions are saturating functions: $V_{max}$ and $K_m$ define the shape of the Michaelis-Menten uptake curve and $\mu_{max}$ and $Q_{min}$ define the shape of the growth response which is $0$ when internal stores are depleted to the minimum value $Q_{min}$.
 
@@ -76,7 +76,7 @@ where $d = \mu = \mu_{max}\left(1-\frac{Q_{min}}{Q^*}\right)$ and $X^*$ is set b
 # dQ/dt = rho(Q) - mu*Q
 # dX/dt = X (mu(Q) - d)
 # mu(Q) = mumax ( 1 - Qmin/Q)
-# rho(Q) = Vmax R / (Km + R)
+# rho(R) = Vmax R / (Km + R)
 # conservation law: d/dt(R + XQ) = 0 = dR/dt + XdQ/dt + QdX/dt 
 
 culture.chemostat <- function(t, state, parameters) {
