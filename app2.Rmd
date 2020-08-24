@@ -24,7 +24,7 @@ library(plotly)
 
 In this document I explore a variable internal stores model of phytoplankton culture growth adapted from [Grover (1991)](https://www.journals.uchicago.edu/doi/abs/10.1086/285254).
 
-There are three pools: resources in the growth medium, such as nitrate, $R$ (mol L$^{-1}$), resources stored in the cell and available for growth, $Q$ (mol cell$^{-1}$), and the cell density, $X$ (cells L$^{-1}$). In the examples below I don't use these units. Instead, all quantities are chosen to be close to 1. Plausible values for _Thalassiosira pseudonana_ and the development of non-dimensionalized equations are explored after some examples.
+There are three pools: resources in the growth medium, such as nitrate, $R$ (mol L$^{-1}$), resources stored in the cell and available for growth, $Q$ (mol cell$^{-1}$), and the cell density, $X$ (cells L$^{-1}$). In the examples below I don't use these units. Instead, all quantities are chosen to be close to 1. Plausible values for _Thalassiosira pseudonana_ and the development of non-dimensionalized equations are explored after some examples. Finally I discuss the connection between these models and estimating growth rates in culture.
 
 ## Equations
 
@@ -393,8 +393,19 @@ We will use $V_{max} = 1.0 d^{-1}$ and $k_m = 0.1 \mu$ mol L$^{-1}$. Note that $
 This simple model does not place an upper bound on $Q$.
 
 
+## Estimating growth rates
 
-## Exercises
+A good model should provide clarity about the meaning of measurements and the ability to make predictions. Since growth rate is a key quantity in these models, it's natural to ask what we can learn about estimating growth rates.
+
+In a batch cutlure, the conditions are always changing, so the growth rate is changing. The model can be fit to observed data and used to estimate growth rate as it changes over time. This is not commonly done and the interpretation of the result depends on the model being at least partly correct.
+
+In a chemostat, the growth rate is equal to the dilution rate set by the experimentalist, once equilibrium has been achieved.
+
+In a turbidostat, the growth rate is the dilution rate, but the experimental control is the cell density. The dilution rate (volume of new media added per day divided by the constant culture volume) is measured as the dilution is tracked by the monitoring software. In our turbidostat culture is added every minute as needed, which is a very good approximation to a continuous culture. So the calculation of growth rate is easy: dilution rate per unit time. Time periods of any length can be used with the caveat that the cell density should be constant over the observed time period. If conditions, e.g., irradiance, are changing, then growth rate will be changing and we can only measure average growth rate. Fancier analysis is possible to estimate instantaneous growth rate using data assimilation methds.
+
+Finally, the semi-continuous batch growth rate, which is most familiar to people in our lab, is best estimated from linear regression of log projected cell density (cell density scaled by periodic, discrete dilutions) against time. How and why is this different from the turbidostat growth rate? Why can't we just use dilution rate or why don't we use linear regression for the turbidostat? The first reason is the continuous culture has discrete dilutions which are infrequent compared to the growth rate (there may be multiple doublings between dilutions) and the second reason is that the biomass is not constant in a continuous culture. Linear regression can be used in a turbidostat to estimate growth rate, by using the frequent dilutions to scale the cell densities. It simply isn't necessary.
+
+## Exercises (not developed yet)
 
 Play around with the various scenarios.
 
